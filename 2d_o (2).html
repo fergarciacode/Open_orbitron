@@ -1,0 +1,2777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generic Atom Diagram</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- D3.js for zoom and pan -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            max-width: 900px;
+            width: 100%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 2.25rem; /* text-4xl */
+            font-weight: 700; /* font-bold */
+            color: #1a202c; /* gray-900 */
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-wrap: wrap; /* Allow wrapping for smaller screens */
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+
+        .input-group label {
+            font-size: 1.125rem; /* text-lg */
+            color: #4a5568; /* gray-700 */
+            font-weight: 600;
+        }
+
+        .input-group input[type="number"] {
+            padding: 10px 15px;
+            border: 2px solid #cbd5e0; /* gray-300 */
+            border-radius: 8px;
+            font-size: 1rem;
+            width: 120px;
+            text-align: center;
+        }
+
+        .input-group button {
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            /* Specific colors for emission/absorption buttons */
+            background-color: #4299e1; /* Default blue for generate */
+        }
+        .input-group button#showEmissionBtn {
+            background-color: #2f855a; /* Green for Emission */
+        }
+        .input-group button#showAbsorptionBtn {
+            background-color: #6b46c1; /* Purple for Absorption */
+        }
+        .input-group button#resetViewBtn {
+            background-color: #e07b39; /* Orange for Reset */
+        }
+
+        .input-group button:hover {
+            transform: translateY(-1px);
+        }
+        .input-group button#showEmissionBtn:hover {
+            background-color: #276749; /* Darker green */
+        }
+        .input-group button#showAbsorptionBtn:hover {
+            background-color: #553c9a; /* Darker purple */
+        }
+        .input-group button#generateAtomBtn:hover {
+            background-color: #3182ce; /* Darker blue */
+        }
+        .input-group button#resetViewBtn:hover {
+            background-color: #cc6a2c; /* Darker orange */
+        }
+
+        .input-group button:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+
+        svg {
+            border: 2px solid #e2e8f0; /* gray-200 */
+            border-radius: 15px;
+            background-color: #ffffff;
+            max-width: 100%;
+            height: auto; /* Maintain aspect ratio */
+            margin-bottom: 20px;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .nucleus-text {
+            font-size: 0.875rem; /* text-sm */
+            font-weight: 600; /* font-semibold */
+            fill: #4a5568; /* gray-700 */
+            /* Default text size, will be scaled by D3 */
+        }
+
+        .electron-shell {
+            fill: none;
+            stroke: #4299e1; /* blue-500 */
+            stroke-width: 1.5;
+            transition: stroke-width 0.2s ease-in-out;
+        }
+
+        .electron-shell:hover {
+            stroke-width: 2.5;
+        }
+
+        .electron-particle {
+            fill: #ed8936; /* orange-500 */
+        }
+
+        .electron-label {
+            fill: #1a202c; /* Dark text for readability */
+            font-size: 8px; /* Very small to fit */
+            text-anchor: middle;
+            dominant-baseline: middle;
+            pointer-events: none; /* Do not block interaction with the electron group */
+            /* Default text size, will be scaled by D3 */
+        }
+
+        .proton {
+            fill: #e53e3e; /* red-600 */
+            opacity: 0.6; /* Semitransparent */
+        }
+
+        .neutron {
+            fill: #4a5568; /* gray-700 */
+            opacity: 0.6; /* Semitransparent */
+        }
+
+        .info-box, .orbital-info, .transitions-info, .notation-info {
+            background-color: #e2e8f0; /* gray-200 */
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            text-align: left;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .info-box p, .orbital-info p, .transitions-info p, .notation-info p {
+            font-size: 1rem; /* text-base */
+            color: #2d3748; /* gray-800 */
+            margin-bottom: 8px;
+        }
+
+        .info-box p strong, .orbital-info h3, .transitions-info h3, .notation-info h3 {
+            color: #1a202c; /* gray-900 */
+            font-weight: 700;
+        }
+
+        .orbital-info ul, .transitions-info ul, .notation-info ul {
+            list-style: disc;
+            margin-left: 20px;
+            margin-bottom: 10px;
+        }
+
+        .orbital-info li, .transitions-info li, .notation-info li {
+            margin-bottom: 4px;
+            color: #2d3748;
+        }
+
+        /* Tooltip styles */
+        .tooltip {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+            z-index: 1000;
+            max-width: 250px; /* Limit tooltip width */
+            text-align: left;
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+        }
+
+        /* Transition colors */
+        .transition-arrow.emission {
+            stroke: #2f855a; /* Green for Emission */
+            marker-end: url(#arrowhead-emission);
+        }
+        .transition-text.emission {
+            fill: #2f855a;
+        }
+
+        .transition-arrow.absorption {
+            stroke: #6b46c1; /* Purple for Absorption */
+            marker-end: url(#arrowhead-absorption);
+        }
+        .transition-text.absorption {
+            fill: #6b46c1;
+        }
+
+        .transition-arrow {
+            stroke-width: 2.5;
+            opacity: 0; /* Hidden by default */
+            transition: opacity 0.3s ease-in-out;
+            cursor: pointer; /* Indicate it's clickable */
+        }
+
+        .transition-arrow.visible {
+            opacity: 1;
+        }
+
+        .transition-text {
+            font-size: 0.75rem; /* Smaller to fit more labels, will be scaled by D3 */
+            font-weight: 600;
+            opacity: 0; /* Hidden by default */
+            transition: opacity 0.3s ease-in-out;
+            pointer-events: none; /* Do not block interaction with the arrow */
+        }
+
+        .transition-text.visible {
+            opacity: 1;
+        }
+
+        /* Modal for detailed transition info */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 80%; /* Could be responsive */
+            max-width: 600px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .close-button {
+            color: #aaa;
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+    <div class="container">
+        <h1>Generic Atom Diagram</h1>
+
+        <div class="input-group">
+            <label for="atomicNumberInput">Atomic Number (Z):</label>
+            <input type="number" id="atomicNumberInput" value="14" min="1" max="118">
+            <button id="generateAtomBtn">Generate Atom</button>
+            <button id="showEmissionBtn" class="bg-green-600 hover:bg-green-700">Show Emission</button>
+            <button id="showAbsorptionBtn" class="bg-purple-600 hover:bg-purple-700">Show Absorption</button>
+            <button id="resetViewBtn" class="bg-orange-600 hover:bg-orange-700">Reset View</button>
+        </div>
+
+        <svg id="atomSvg" width="700" height="700" viewBox="0 0 700 700">
+            <!-- Define arrowhead markers for different colors -->
+            <defs>
+                <!-- Smaller markerWidth and markerHeight for smaller arrow tips -->
+                <!-- refX should be equal to markerWidth so the tip touches the end of the line segment -->
+                <marker id="arrowhead-emission" markerWidth="4" markerHeight="3"
+                    refX="4" refY="1.5" orient="auto">
+                    <polygon points="0 0, 4 1.5, 0 3" fill="#2f855a" />
+                </marker>
+                <marker id="arrowhead-absorption" markerWidth="4" markerHeight="3"
+                    refX="4" refY="1.5" orient="auto">
+                    <polygon points="0 0, 4 1.5, 0 3" fill="#6b46c1" />
+                </marker>
+            </defs>
+
+            <!-- Group for zoomable content -->
+            <g id="zoomable-elements">
+                <!-- Nucleus (represented by a central circle for visual grouping) -->
+                <!-- The nucleus circle should also be part of the zoomable elements group -->
+                <circle cx="0" cy="0" r="50" fill="#cbd5e0" id="central-nucleus-visual" />
+
+                <!-- Protons and Neutrons placeholder - will be dynamically generated -->
+                <g id="nucleus-particles"></g>
+
+                <!-- Nucleus Text placeholder - will be dynamically generated -->
+                <text id="protonsText" x="0" y="-10" text-anchor="middle" class="nucleus-text"></text>
+                <text id="neutronsText" x="0" y="10" text-anchor="middle" class="nucleus-text"></text>
+
+                <!-- Electron Subshell Circles placeholder - will be dynamically generated -->
+                <g id="electron-subshells"></g>
+
+                <!-- Electrons placeholder - will be dynamically generated -->
+                <g id="electrons"></g>
+
+                <!-- Transitions placeholder - will be dynamically generated -->
+                <g id="transitions-group"></g>
+            </g>
+        </svg>
+
+        <div class="info-box">
+            <p><strong>Element:</strong> <span id="elementName">Silicon</span></p>
+            <p><strong>Atomic Number (Z):</strong> <span id="atomicNumberDisplay">14</span></p>
+            <p><strong>Protons:</strong> <span id="protonsDisplay">14</span></p>
+            <p><strong>Neutrons:</strong> <span id="neutronsDisplay">14</span> <small>(for a common isotope)</small></p>
+            <p><strong>Electrons:</strong> <span id="electronsDisplay">14</span></p>
+            <p><strong>Electron Shell Configuration (Bohr):</strong> <span id="shellConfigDisplay">2, 8, 4</span></p>
+            <p><strong>Electron Configuration (Subshells):</strong> <span id="subshellConfigDisplay"></span></p>
+            <p class="mt-4 text-sm text-gray-600">
+                <em>Note: This diagram uses a simplified Bohr model for electron shells. In reality, electron distributions are governed by quantum mechanics, leading to more complex orbital shapes. The neutron count represents a common isotope and may vary. Electron labels (e.g., 1s<sub>1</sub>) indicate orbital type and a unique index within that orbital type. <br>X-ray transition labels (e.g., L<sub>II</sub> &rarr; K<sub>&alpha;</sub>) refer to subshell energy levels that include fine structure (spin-orbit coupling) not explicitly depicted in this Bohr model. The subshell type (s, p, d) is used for clarity.</em>
+            </p>
+        </div>
+
+        <div class="orbital-info">
+            <h3>Orbital Names per Shell</h3>
+            <ul id="orbitalNamesList">
+                <li>Shell 1 (n=1): 1s</li>
+                <li>Shell 2 (n=2): 2s, 2p</li>
+                <li>Shell 3 (n=3): 3s, 3p, 3d</li>
+                <!-- More will be added dynamically -->
+            </ul>
+        </div>
+
+        <div class="notation-info">
+            <h3>Notation Correspondence</h3>
+            <p>In atomic physics, there are two common ways to refer to electron shells and subshells:</p>
+            <ul>
+                <li><strong>Bohr Shells (K, L, M, N...)</strong>: These are the historical designations for the main electron shells, starting from the innermost:
+                    <ul>
+                        <li><strong>K-shell</strong>: Corresponds to the principal quantum number `n=1`. Contains the `1s` subshell.</li>
+                        <li><strong>L-shell</strong>: Corresponds to `n=2`. Contains the `2s` and `2p` subshells.</li>
+                        <li><strong>M-shell</strong>: Corresponds to `n=3`. Contains the `3s, 3p,` and `3d` subshells.</li>
+                        <li><strong>N-shell</strong>: Corresponds to `n=4`. Contains the `4s, 4p, 4d,` and `4f` subshells.</li>
+                        <li>And so on for O, P, Q... shells (n=5, 6, 7...).</li>
+                    </ul>
+                </li>
+                <li><strong>Quantum Mechanical Subshells (1s, 2p, 3d...)</strong>: These notations, derived from quantum mechanics, specify both the principal quantum number (`n`) and the azimuthal quantum number (`l`), which defines the orbital's shape (s, p, d, f):
+                    <ul>
+                        <li><strong>s-orbitals (l=0)</strong>: Spherical shape (e.g., `1s, 2s, 3s`).</li>
+                        <li><strong>p-orbitals (l=1)</strong>: Dumbbell shape (e.g., `2p, 3p, 4p`).</li>
+                        <li><strong>d-orbitals (l=2)</strong>: More complex cloverleaf/dumbbell shapes (e.g., `3d, 4d, 5d`).</li>
+                        <li><strong>f-orbitals (l=3)</strong>: Even more complex multi-lobed shapes (e.g., `4f, 5f`).</li>
+                    </ul>
+                </li>
+            </ul>
+            <p>Therefore, a transition labeled "K-series" generally refers to an electron moving into the `n=1` (or `1s`) shell, while "L-series" refers to an "electron moving into the `n=2` (or `2s/2p`) shell, and so on. The specific subshell (e.g., `2p -> 1s`) provides a more precise description of the electron's initial and final states.</p>
+        </div>
+
+        <div id="tooltip" class="tooltip"></div>
+    </div>
+
+    <!-- Modal for Transition Details -->
+    <div id="transitionModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="closeModalBtn">&times;</span>
+            <h3>Electron Transition Details</h3>
+            <div id="transitionDetailsContent">
+                <p>Select a transition on the diagram for more details.</p>
+                <p class="text-sm text-gray-600 mt-2">
+                    <em>Actual values depend on specific quantum mechanical states and require experimental data. X-ray transition labels (e.g., L<sub>II</sub> &rarr; K<sub>&alpha;</sub>) refer to subshell energy levels that include fine structure (spin-orbit coupling) not explicitly depicted in this Bohr model. The subshell type (s, p, d) is used for clarity.</em>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Ensure subshellCapacities is defined as early as possible globally
+        const subshellCapacities = {
+            's': 2, 'p': 6, 'd': 10, 'f': 14
+        };
+
+        // --- Global Constants and DOM Elements ---
+        const atomicNumberInput = document.getElementById('atomicNumberInput');
+        const generateAtomBtn = document.getElementById('generateAtomBtn');
+        const showEmissionBtn = document.getElementById('showEmissionBtn');
+        const showAbsorptionBtn = document.getElementById('showAbsorptionBtn');
+        const resetViewBtn = document.getElementById('resetViewBtn');
+        const atomSvg = d3.select("#atomSvg");
+        const zoomableElementsGroup = d3.select("#zoomable-elements");
+        const nucleusParticlesGroup = d3.select('#nucleus-particles');
+        const protonsText = d3.select('#protonsText');
+        const neutronsText = d3.select('#neutronsText');
+        const electronSubshellsGroup = d3.select('#electron-subshells');
+        const electronsGroup = d3.select('#electrons');
+        const transitionsGroup = d3.select('#transitions-group');
+        const tooltip = document.getElementById('tooltip');
+        const transitionModal = document.getElementById('transitionModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const transitionDetailsContent = document.getElementById('transitionDetailsContent');
+
+        // Info box elements
+        const elementNameDisplay = document.getElementById('elementName');
+        const atomicNumberDisplay = document.getElementById('atomicNumberDisplay');
+        const protonsDisplay = document.getElementById('protonsDisplay');
+        const neutronsDisplay = document.getElementById('neutronsDisplay');
+        const electronsDisplay = document.getElementById('electronsDisplay');
+        const shellConfigDisplay = document.getElementById('shellConfigDisplay');
+        const subshellConfigDisplay = document.getElementById('subshellConfigDisplay');
+        const orbitalNamesList = document.getElementById('orbitalNamesList');
+
+        let isEmissionVisible = false;
+        let isAbsorptionVisible = false;
+        let allGeneratedTransitions = [];
+
+        // Define constants for drawing
+        const nucleusRadius = 50;
+        const electronRadius = 15;
+        const baseShellRadius = 50;
+        const shellBandWidth = 100;
+        const subshellOffsetInternal = 20;
+        const orbitalTypes = ['s', 'p', 'd', 'f'];
+        const orbitalTypeLValues = { 's': 0, 'p': 1, 'd': 2, 'f': 3 };
+        const drawingCenterX = 0; // Atom center is at (0,0) in the SVG's internal coordinate system
+        const drawingCenterY = 0; // Atom center is at (0,0) in the SVG's internal coordinate system
+
+        // Global map to store the calculated radial positions for each subshell
+        const subshellRadiiMap = {};
+
+        // Data for elements (simplified, can be expanded)
+        const elementsData = {
+            1: { name: "Hydrogen", atomicMass: 1.008 }, 2: { name: "Helium", atomicMass: 4.0026 },
+            3: { name: "Lithium", atomicMass: 6.94 }, 4: { name: "Beryllium", atomicMass: 9.0122 },
+            5: { name: "Boron", atomicMass: 10.81 }, 6: { name: "Carbon", atomicMass: 12.011 },
+            7: { name: "Nitrogen", atomicMass: 14.007 }, 8: { name: "Oxygen", atomicMass: 15.999 },
+            9: { name: "Fluorine", atomicMass: 18.998 }, 10: { name: "Neon", atomicMass: 20.180 },
+            11: { name: "Sodium", atomicMass: 22.990 }, 12: { name: "Magnesium", atomicMass: 24.305 },
+            13: { name: "Aluminum", atomicMass: 26.982 }, 14: { name: "Silicon", atomicMass: 28.085 },
+            15: { name: "Phosphorus", atomicMass: 30.974 }, 16: { name: "Sulfur", atomicMass: 32.06 },
+            17: { name: "Chlorine", atomicMass: 35.45 }, 18: { name: "Argon", atomicMass: 39.948 },
+            19: { name: "Potassium", atomicMass: 39.098 }, 20: { name: "Calcium", atomicMass: 40.078 },
+            21: { name: "Scandium", atomicMass: 44.956 }, 22: { name: "Titanium", atomicMass: 47.867 },
+            23: { name: "Vanadium", atomicMass: 50.942 }, 24: { name: "Chromium", atomicMass: 51.996 },
+            25: { name: "Manganese", atomicMass: 54.938 }, 26: { name: "Iron", atomicMass: 55.845 },
+            27: { name: "Cobalt", atomicMass: 58.933 }, 28: { name: "Nickel", atomicMass: 58.693 },
+            29: { name: "Copper", atomicMass: 63.546 }, 30: { name: "Zinc", atomicMass: 65.38 },
+            31: { name: "Gallium", atomicMass: 69.723 }, 32: { name: "Germanium", atomicMass: 72.63 },
+            33: { name: "Arsenic", atomicMass: 74.922 }, 34: { name: "Selenium", atomicMass: 78.971 },
+            35: { name: "Bromine", atomicMass: 79.904 }, 36: { name: "Krypton", atomicMass: 83.798 },
+            37: { name: "Rubidium", atomicMass: 85.468 }, 38: { name: "Strontium", atomicMass: 87.62 },
+            39: { name: "Yttrium", atomicMass: 88.906 }, 40: { name: "Zirconium", atomicMass: 91.224 },
+            41: { name: "Niobium", atomicMass: 92.906 }, 42: { name: "Molybdenum", atomicMass: 95.95 },
+            43: { name: "Technetium", atomicMass: 98 }, 44: { name: "Ruthenium", atomicMass: 101.07 },
+            45: { name: "Rhodium", atomicMass: 102.91 }, 46: { name: "Palladium", atomicMass: 106.42 },
+            47: { name: "Silver", atomicMass: 107.87 }, 48: { name: "Cadmium", atomicMass: 112.41 },
+            49: { name: "Indium", atomicMass: 114.82 }, 50: { name: "Tin", atomicMass: 118.71 },
+            51: { name: "Antimony", atomicMass: 121.76 }, 52: { name: "Tellurium", atomicMass: 127.60 },
+            53: { name: "Iodine", atomicMass: 126.90 }, 54: { name: "Xenon", atomicMass: 131.29 },
+            55: { name: "Cesium", atomicMass: 132.91 }, 56: { name: "Barium", atomicMass: 137.33 },
+            57: { name: "Lanthanum", atomicMass: 138.91 }, 58: { name: "Cerium", atomicMass: 140.12 },
+            59: { name: "Praseodymium", atomicMass: 140.91 }, 60: { name: "Neodymium", atomicMass: 144.24 },
+            61: { name: "Promethium", atomicMass: 145 }, 62: { name: "Samarium", atomicMass: 150.36 },
+            63: { name: "Europium", atomicMass: 151.96 }, 64: { name: "Gadolinium", atomicMass: 157.25 },
+            65: { name: "Terbium", atomicMass: 158.93 }, 66: { name: "Dysprosium", atomicMass: 162.50 },
+            67: { name: "Holmium", atomicMass: 164.93 }, 68: { name: "Erbium", atomicMass: 167.26 },
+            69: { name: "Thulium", atomicMass: 168.93 }, 70: { name: "Ytterbium", atomicMass: 173.05 },
+            71: { name: "Lutetium", atomicMass: 174.97 }, 72: { name: "Hafnium", atomicMass: 178.49 },
+            73: { name: "Tantalum", atomicMass: 180.95 }, 74: { name: "Tungsten", atomicMass: 183.84 },
+            75: { name: "Rhenium", atomicMass: 186.21 }, 76: { name: "Osmium", atomicMass: 190.23 },
+            77: { name: "Iridium", atomicMass: 192.22 }, 78: { name: "Platinum", atomicMass: 195.08 },
+            79: { name: "Gold", atomicMass: 196.967 }, 80: { name: "Mercury", atomicMass: 200.59 },
+            81: { name: "Thallium", atomicMass: 204.38 }, 82: { name: "Lead", atomicMass: 207.2 },
+            83: { name: "Bismuth", atomicMass: 208.98 }, 84: { name: "Polonium", atomicMass: 209 },
+            85: { name: "Astatine", atomicMass: 210 }, 86: { name: "Radon", atomicMass: 222 },
+            87: { name: "Francium", atomicMass: 223 }, 88: { name: "Radium", atomicMass: 226 },
+            89: { name: "Actinium", atomicMass: 227 }, 90: { name: "Thorium", atomicMass: 232.04 },
+            91: { name: "Protactinium", atomicAss: 231.04 }, 92: { name: "Uranium", atomicMass: 238.03 },
+            93: { name: "Neptunium", atomicMass: 237 }, 94: { name: "Plutonium", atomicMass: 244 },
+            95: { name: "Americium", atomicMass: 243 }, 96: { name: "Curium", atomicMass: 247 },
+            97: { name: "Berkelium", atomicMass: 247 }, 98: { name: "Californium", atomicMass: 251 },
+            99: { name: "Einsteinium", atomicMass: 252 }, 100: { name: "Fermium", atomicMass: 257 },
+            101: { name: "Mendelevium", atomicMass: 258 }, 102: { name: "Nobelium", atomicMass: 259 },
+            103: { name: "Lawrencium", atomicMass: 262 }, 104: { name: "Rutherfordium", atomicMass: 267 },
+            105: { name: "Dubnium", atomicMass: 268 }, 106: { name: "Seaborgium", atomicMass: 271 },
+            107: { name: "Bohrium", atomicMass: 272 }, 108: { name: "Hassium", atomicMass: 277 },
+            109: { name: "Meitnerium", atomicMass: 276 }, 110: { name: "Darmstadtium", atomicMass: 281 },
+            111: { name: "Roentgenium", atomicMass: 280 }, 112: { name: "Copernicium", atomicMass: 285 },
+            113: { name: "Nihonium", atomicMass: 286 }, 114: { name: "Flerovium", atomicMass: 289 },
+            115: { name: "Moscovium", atomicMass: 290 }, 116: { name: "Livermorium", atomicMass: 293 },
+            117: { name: "Tennessine", atomicMass: 294 }, 118: { name: "Oganesson", atomicMass: 294 }
+        };
+
+        // Global variable to store parsed custom energy levels
+        const parsedCustomEnergyLevels = new Map();
+
+        // Mapping for subshell character to its orbital type (s, p, d, f)
+        const subshellCharToType = {
+            'K': 's',
+            'L1': 's', 'L2': 'p', 'L3': 'p',
+            'M1': 's', 'M2': 'p', 'M3': 'p', 'M4': 'd', 'M5': 'd',
+            'N1': 's', 'N2': 'p', 'N3': 'p', 'N4': 'd', 'N5': 'd', 'N6': 'f', 'N7': 'f',
+            'O1': 's', 'O2': 'p', 'O3': 'p', 'O4': 'd', 'O5': 'd', 'O6': 'f', 'O7': 'f',
+            'P1': 's', 'P2': 'p', 'P3': 'p', 'P4': 'd', 'P5': 'd',
+        };
+        
+        // --- X-Ray Transition Energy Data (Subset from NIST/X-Ray Data Booklet) ---
+        const transitionEnergiesData = {
+            14: { // Silicon
+                '2p-1s': 1739.98,
+                '3p-1s': 1835.94,
+            },
+            26: { // Iron
+                '2p-1s': 6403.84,
+                '3p-1s': 7057.98,
+                '3d-2p': 705.0,
+                '4d-2p': 718.5,
+                '3s-2p': 694.6,
+            },
+            29: { // Copper
+                '2p-1s': 8047.78,
+                '3p-1s': 8905.29,
+                '3d-2p': 929.7,
+                '4d-2p': 949.8,
+                '3s-2p': 910.6,
+            },
+            50: { // Tin
+                '2p-1s': 25270,
+                '3p-1s': 28490,
+                '3d-2p': 3444,
+                '4d-2p': 3662,
+            },
+            79: { // Gold
+                '2p-1s': 68803.7,
+                '3p-1s': 77984.0,
+                '3d-2p': 9713.3,
+                '4d-2p': 11442.3,
+            },
+            80: { // Mercury
+                '2p-1s': 70819.0,
+                '3p-1s': 80253.0,
+                '3d-2p': 9988.8,
+                '4d-2p': 11822.6,
+            }
+        };
+
+        // Mapping for common X-ray transition naming (simplification)
+        const xRayShellMapping = {
+            1: 'K', 2: 'L', 3: 'M', 4: 'N', 5: 'O', 6: 'P', 7: 'Q'
+        };
+
+        // Content of edges.txt is embedded directly here.
+        const edgesDataContent = `
+1 K 13.6
+2 K 24.6
+3 K 54.8
+3 L1 5.3
+4 K 112.1
+4 L1 8.0
+5 K 188.0
+5 L1 12.6
+5 L2 4.7
+5 L3 4.7
+6 K 283.8
+6 L1 18.0
+6 L2 6.4
+6 L3 6.4
+7 K 401.6
+7 L1 24.4
+7 L2 9.2
+7 L3 9.2
+8 K 532.0
+8 L1 28.5
+8 L2 7.1
+8 L3 7.1
+9 K 685.4
+9 L1 34.0
+9 L2 8.6
+9 L3 8.6
+10 K 870.1
+10 L1 48.5
+10 L2 21.7
+10 L3 21.6
+11 K 1072.1
+11 L1 63.3
+11 L2 31.1
+11 L3 31.1
+11 M1 0.7
+12 K 1305.0
+12 L1 89.4
+12 L2 51.4
+12 L3 51.4
+12 M1 2.1
+13 K 1559.6
+13 L1 117.7
+13 L2 73.2
+13 L3 72.7
+13 M1 0.7
+13 M2 5.5
+13 M3 5.5
+14 K 1838.9
+14 L1 148.7
+14 L2 99.5
+14 L3 98.9
+14 M1 7.6
+14 M2 3.0
+14 M3 3.0
+15 K 2145.5
+15 L1 189.3
+15 L2 136.2
+15 L3 135.3
+15 M1 16.2
+15 M2 9.9
+15 M3 9.9
+16 K 2472.0
+16 L1 229.2
+16 L2 165.4
+16 L3 164.2
+16 M1 15.8
+16 M2 8.0
+16 M3 8.0
+17 K 2822.4
+17 L1 270.2
+17 L2 201.6
+17 L3 200.0
+17 M1 17.5
+17 M2 6.8
+17 M3 6.8
+18 K 3206.0
+18 L1 326.3
+18 L2 250.7
+18 L3 248.6
+18 M1 29.2
+18 M2 15.9
+18 M3 15.8
+19 K 3607.4
+19 L1 377.1
+19 L2 296.3
+19 L3 293.6
+19 M1 33.9
+19 M2 17.8
+19 M3 17.8
+20 K 4038.1
+20 L1 437.8
+20 L2 350.0
+20 L3 346.4
+20 M1 43.7
+20 M2 25.4
+20 M3 25.4
+21 K 4492.8
+21 L1 500.4
+21 L2 406.7
+21 L3 402.2
+21 M1 53.8
+21 M2 32.3
+21 M3 32.3
+21 M4 6.6
+21 M5 6.6
+22 K 4966.4
+22 L1 563.7
+22 L2 461.5
+22 L3 455.5
+22 M1 60.3
+22 M2 34.6
+22 M3 34.6
+22 M4 3.7
+22 M5 3.7
+23 K 5465.1
+23 L1 628.2
+23 L2 520.5
+23 L3 512.9
+23 M1 66.5
+23 M2 37.8
+23 M3 37.8
+23 M4 2.2
+23 M5 2.2
+24 K 5989.2
+24 L1 694.6
+24 L2 583.7
+24 L3 574.5
+24 M1 74.1
+24 M2 42.5
+24 M3 42.5
+24 M4 2.3
+24 M5 2.3
+25 K 6539.0
+25 L1 769.0
+25 L2 651.4
+25 L3 640.3
+25 M1 83.9
+25 M2 48.6
+25 M3 48.6
+25 M4 3.3
+25 M5 3.3
+26 K 7112.0
+26 L1 846.1
+26 L2 721.1
+26 L3 708.1
+26 M1 92.9
+26 M2 54.0
+26 M3 54.0
+26 M4 3.6
+26 M5 3.6
+27 K 7708.9
+27 L1 925.6
+27 L2 793.6
+27 L3 778.6
+27 M1 100.7
+27 M2 59.5
+27 M3 59.5
+27 M4 2.9
+27 M5 2.9
+28 K 8332.8
+28 L1 1008.1
+28 L2 871.9
+28 L3 854.7
+28 M1 111.8
+28 M2 68.1
+28 M3 68.1
+28 M4 3.6
+28 M5 3.6
+29 K 8978.9
+29 L1 1096.1
+29 L2 951.0
+29 L3 931.1
+29 M1 119.8
+29 M2 73.6
+29 M3 73.6
+29 M4 1.6
+29 M5 1.6
+30 K 9658.6
+30 L1 1193.6
+30 L2 1042.8
+30 L3 1019.7
+30 M1 135.9
+30 M2 86.6
+30 M3 86.6
+30 M4 8.1
+30 M5 8.1
+31 K 10367.1
+31 L1 1297.7
+31 L2 1142.3
+31 L3 1115.4
+31 M1 158.1
+31 M2 106.8
+31 M3 102.9
+31 M4 17.4
+31 M5 17.4
+31 N1 1.5
+31 N2 0.8
+31 N3 0.8
+32 K 11103.1
+32 L1 1414.3
+32 L2 1247.8
+32 L3 1216.7
+32 M1 180.0
+32 M2 127.9
+32 M3 120.8
+32 M4 28.7
+32 M5 28.7
+32 N1 5.0
+32 N2 2.3
+32 N3 2.3
+33 K 11866.7
+33 L1 1526.5
+33 L2 1358.6
+33 L3 1323.1
+33 M1 203.5
+33 M2 146.4
+33 M3 140.5
+33 M4 41.2
+33 M5 41.2
+33 N1 8.5
+33 N2 2.5
+33 N3 2.5
+34 K 12657.8
+34 L1 1653.9
+34 L2 1476.2
+34 L3 1435.8
+34 M1 231.5
+34 M2 168.2
+34 M3 161.9
+34 M4 56.7
+34 M5 56.7
+34 N1 12.0
+34 N2 5.6
+34 N3 5.6
+35 K 13473.7
+35 L1 1782.0
+35 L2 1596.0
+35 L3 1549.9
+35 M1 256.5
+35 M2 189.3
+35 M3 181.5
+35 M4 70.1
+35 M5 69.0
+35 N1 27.3
+35 N2 5.2
+35 N3 4.6
+36 K 14325.6
+36 L1 1921.0
+36 L2 1727.2
+36 L3 1674.9
+36 M1 292.1
+36 M2 221.8
+36 M3 214.5
+36 M4 95.0
+36 M5 93.8
+36 N1 27.5
+36 N2 14.7
+36 N3 14.0
+37 K 15199.7
+37 L1 2065.1
+37 L2 1863.9
+37 L3 1804.4
+37 M1 322.1
+37 M2 247.4
+37 M3 238.5
+37 M4 111.8
+37 M5 110.3
+37 N1 29.3
+37 N2 14.8
+37 N3 14.0
+38 K 16104.6
+38 L1 2216.3
+38 L2 2006.8
+38 L3 1939.6
+38 M1 357.5
+38 M2 279.8
+38 M3 269.1
+38 M4 135.0
+38 M5 133.1
+38 N1 37.7
+38 N2 19.9
+38 N3 19.9
+39 K 17038.4
+39 L1 2372.5
+39 L2 2155.5
+39 L3 2080.0
+39 M1 393.6
+39 M2 312.4
+39 M3 300.3
+39 M4 159.6
+39 M5 157.4
+39 N1 45.4
+39 N2 25.6
+39 N3 25.6
+39 N4 2.4
+39 N5 2.4
+40 K 17997.6
+40 L1 2531.6
+40 L2 2306.7
+40 L3 2222.3
+40 M1 430.3
+40 M2 344.2
+40 M3 330.5
+40 M4 182.4
+40 M5 180.0
+40 N1 51.3
+40 N2 28.7
+40 N3 28.7
+40 N4 3.0
+40 N5 3.0
+41 K 18985.6
+41 L1 2697.7
+41 L2 2464.7
+41 L3 2370.5
+41 M1 468.4
+41 M2 378.4
+41 M3 363.0
+41 M4 207.4
+41 M5 204.6
+41 N1 58.1
+41 N2 33.9
+41 N3 33.9
+41 N4 3.2
+41 N5 3.2
+42 K 19999.5
+42 L1 2865.5
+42 L2 2625.1
+42 L3 2520.2
+42 M1 504.6
+42 M2 409.7
+42 M3 392.3
+42 M4 230.3
+42 M5 227.0
+42 N1 61.8
+42 N2 34.8
+42 N3 34.8
+42 N4 1.8
+42 N5 1.8
+43 K 21044.0
+43 L1 3042.5
+43 L2 2793.2
+43 L3 2676.9
+43 M1 544.0
+43 M2 444.9
+43 M3 425.0
+43 M4 256.4
+43 M5 252.9
+43 N1 68.0
+43 N2 38.9
+43 N3 38.9
+43 N4 2.0
+43 N5 2.0
+44 K 22117.2
+44 L1 3224.0
+44 L2 2966.9
+44 L3 2837.9
+44 M1 585.0
+44 M2 482.8
+44 M3 460.6
+44 M4 283.6
+44 M5 279.4
+44 N1 74.9
+44 N2 43.1
+44 N3 43.1
+44 N4 2.0
+44 N5 2.0
+45 K 23219.9
+45 L1 3411.9
+45 L2 3146.1
+45 L3 3003.8
+45 M1 627.1
+45 M2 521.0
+45 M3 496.2
+45 M4 311.7
+45 M5 307.0
+45 N1 81.0
+45 N2 47.9
+45 N3 47.9
+45 N4 2.5
+45 N5 2.5
+46 K 24350.3
+46 L1 3604.3
+46 L2 3330.3
+46 L3 3173.3
+46 M1 669.9
+46 M2 559.1
+46 M3 531.5
+46 M4 340.0
+46 M5 334.7
+46 N1 86.4
+46 N2 51.1
+46 N3 51.1
+46 N4 1.5
+46 N5 1.5
+47 K 25514.0
+47 L1 3805.8
+47 L2 3523.7
+47 L3 3351.1
+47 M1 717.5
+47 M2 602.4
+47 M3 571.4
+47 M4 372.8
+47 M5 366.7
+47 N1 95.2
+47 N2 62.6
+47 N3 55.9
+47 N4 3.3
+47 N5 3.3
+48 K 26711.2
+48 L1 4018.0
+48 L2 3727.0
+48 L3 3537.5
+48 M1 770.2
+48 M2 650.7
+48 M3 616.5
+48 M4 410.5
+48 M5 403.7
+48 N1 107.6
+48 N2 66.9
+48 N3 66.9
+48 N4 9.3
+48 N5 9.3
+48 O1 2.2
+48 O2 2.2
+48 O3 2.2
+49 K 27939.9
+49 L1 4237.5
+49 L2 3938.0
+49 L3 3730.1
+49 M1 825.6
+49 M2 702.2
+49 M3 664.3
+49 M4 450.8
+49 M5 443.1
+49 N1 121.9
+49 N2 77.4
+49 N3 77.4
+49 N4 16.2
+49 N5 16.2
+49 O1 0.1
+49 O2 0.8
+49 O3 0.8
+50 K 29200.1
+50 L1 4464.7
+50 L2 4156.1
+50 L3 3928.8
+50 M1 883.8
+50 M2 756.4
+50 M3 714.4
+50 M4 493.3
+50 M5 484.8
+50 N1 136.5
+50 N2 88.6
+50 N3 88.6
+50 N4 23.9
+50 N5 23.9
+50 O1 0.9
+50 O2 1.1
+50 O3 1.1
+51 K 30491.2
+51 L1 4698.3
+51 L2 4380.4
+51 L3 4132.2
+51 M1 943.7
+51 M2 811.9
+51 M3 765.6
+51 M4 536.9
+51 M5 527.5
+51 N1 152.0
+51 N2 98.4
+51 N3 98.4
+51 N4 31.4
+51 N5 31.4
+51 O1 6.7
+51 O2 2.1
+51 O3 2.1
+52 K 31813.8
+52 L1 4939.2
+52 L2 4612.0
+52 L3 4341.4
+52 M1 1006.0
+52 M2 869.7
+52 M3 818.7
+52 M4 582.5
+52 M5 572.1
+52 N1 168.3
+52 N2 110.2
+52 N3 110.2
+52 N4 39.8
+52 N5 39.8
+52 O1 11.6
+52 O2 2.3
+52 O3 2.3
+53 K 33169.4
+53 L1 5188.1
+53 L2 4852.1
+53 L3 4557.1
+53 M1 1072.1
+53 M2 930.5
+53 M3 874.6
+53 M4 631.3
+53 M5 619.4
+53 N1 186.4
+53 N2 122.7
+53 N3 122.7
+53 N4 49.6
+53 N5 49.6
+53 O1 13.6
+53 O2 3.3
+53 O3 3.3
+54 K 34564.4
+54 L1 5452.8
+54 L2 5103.7
+54 L3 4782.2
+54 M1 1148.7
+54 M2 1002.1
+54 M3 940.6
+54 M4 689.4
+54 M5 676.7
+54 N1 213.3
+54 N2 138.8
+54 N3 138.8
+54 N4 60.9
+54 N5 60.9
+54 O1 15.6
+54 O2 4.4
+54 O3 4.4
+55 K 35985.7
+55 L1 5732.1
+55 L2 5361.3
+55 L3 5013.9
+55 M1 1217.0
+55 M2 1058.6
+55 M3 990.2
+55 M4 737.5
+55 M5 723.2
+55 N1 228.6
+55 N2 143.8
+55 N3 143.8
+55 N4 70.3
+55 N5 70.3
+55 O1 13.9
+55 O2 13.9
+55 O3 13.9
+56 K 37441.3
+56 L1 6013.3
+56 L2 5626.8
+56 L3 5250.7
+56 M1 1292.8
+56 M2 1125.8
+56 M3 1051.1
+56 M4 794.1
+56 M5 777.6
+56 N1 251.6
+56 N2 157.0
+56 N3 157.0
+56 N4 82.5
+56 N5 82.5
+56 O1 16.5
+56 O2 16.5
+56 O3 16.5
+56 F1 2.2
+56 F2 2.2
+57 K 38927.9
+57 L1 6310.0
+57 L2 5900.0
+57 L3 5493.0
+57 M1 1380.0
+57 M2 1195.0
+57 M3 1118.0
+57 M4 855.0
+57 M5 836.0
+57 N1 278.0
+57 N2 173.0
+57 N3 173.0
+57 N4 97.0
+57 N5 97.0
+57 O1 19.0
+57 O2 19.0
+57 O3 19.0
+57 F1 2.2
+57 F2 2.2
+58 K 40445.0
+58 L1 6610.0
+58 L2 6180.0
+58 L3 5740.0
+58 M1 1460.0
+58 M2 1262.0
+58 M3 1182.0
+58 M4 919.0
+58 M5 898.0
+58 N1 303.0
+58 N2 188.0
+58 N3 188.0
+58 N4 111.0
+58 N5 111.0
+58 O1 21.0
+58 O2 21.0
+58 O3 21.0
+58 F1 2.0
+58 F2 2.0
+59 K 41991.0
+59 L1 6920.0
+59 L2 6460.0
+59 L3 5990.0
+59 M1 1540.0
+59 M2 1330.0
+59 M3 1245.0
+59 M4 983.0
+59 M5 959.0
+59 N1 330.0
+59 N2 205.0
+59 N3 205.0
+59 N4 125.0
+59 N5 125.0
+59 O1 24.0
+59 O2 24.0
+59 O3 24.0
+59 F1 2.0
+59 F2 2.0
+60 K 43567.0
+60 L1 7230.0
+60 L2 6750.0
+60 L3 6240.0
+60 M1 1620.0
+60 M2 1400.0
+60 M3 1310.0
+60 M4 1050.0
+60 M5 1025.0
+60 N1 356.0
+60 N2 222.0
+60 N3 222.0
+60 N4 140.0
+60 N5 140.0
+60 O1 26.0
+60 O2 26.0
+60 O3 26.0
+60 F1 2.0
+60 F2 2.0
+61 K 45173.0
+61 L1 7560.0
+61 L2 7050.0
+61 L3 6510.0
+61 M1 1710.0
+61 M2 1470.0
+61 M3 1380.0
+61 M4 1120.0
+61 M5 1090.0
+61 N1 385.0
+61 N2 240.0
+61 N3 240.0
+61 N4 156.0
+61 N5 156.0
+61 O1 29.0
+61 O2 29.0
+61 O3 29.0
+61 F1 2.0
+61 F2 2.0
+62 K 46808.0
+62 L1 7890.0
+62 L2 7360.0
+62 L3 6780.0
+62 M1 1800.0
+62 M2 1540.0
+62 M3 1450.0
+62 M4 1190.0
+62 M5 1160.0
+62 N1 412.0
+62 N2 258.0
+62 N3 258.0
+62 N4 172.0
+62 N5 172.0
+62 O1 32.0
+62 O2 32.0
+62 O3 32.0
+62 F1 2.0
+62 F2 2.0
+63 K 48477.0
+63 L1 8230.0
+63 L2 7680.0
+63 L3 7060.0
+63 M1 1890.0
+63 M2 1610.0
+63 M3 1520.0
+63 M4 1260.0
+63 M5 1230.0
+63 N1 440.0
+63 N2 276.0
+63 N3 276.0
+63 N4 188.0
+63 N5 188.0
+63 O1 35.0
+63 O2 35.0
+63 O3 35.0
+63 F1 2.0
+63 F2 2.0
+64 K 50179.0
+64 L1 8580.0
+64 L2 8010.0
+64 L3 7350.0
+64 M1 1980.0
+64 M2 1690.0
+64 M3 1590.0
+64 M4 1330.0
+64 M5 1300.0
+64 N1 469.0
+64 N2 295.0
+64 N3 295.0
+64 N4 205.0
+64 N5 205.0
+64 O1 38.0
+64 O2 38.0
+64 O3 38.0
+64 F1 2.0
+64 F2 2.0
+65 K 51914.0
+65 L1 8940.0
+65 L2 8350.0
+65 L3 7650.0
+65 M1 2070.0
+65 M2 1770.0
+65 M3 1670.0
+65 M4 1400.0
+65 M5 1370.0
+65 N1 499.0
+65 N2 314.0
+65 N3 314.0
+65 N4 223.0
+65 N5 223.0
+65 O1 41.0
+65 O2 41.0
+65 O3 41.0
+65 F1 2.0
+65 F2 2.0
+66 K 53681.0
+66 L1 9300.0
+66 L2 8700.0
+66 L3 7960.0
+66 M1 2170.0
+66 M2 1850.0
+66 M3 1740.0
+66 M4 1480.0
+66 M5 1450.0
+66 N1 530.0
+66 N2 334.0
+66 N3 334.0
+66 N4 242.0
+66 N5 242.0
+66 O1 44.0
+66 O2 44.0
+66 O3 44.0
+66 F1 2.0
+66 F2 2.0
+67 K 55479.0
+67 L1 9680.0
+67 L2 9060.0
+67 L3 8270.0
+67 M1 2270.0
+67 M2 1930.0
+67 M3 1820.0
+67 M4 1560.0
+67 M5 1520.0
+67 N1 562.0
+67 N2 355.0
+67 N3 355.0
+67 N4 260.0
+67 N5 260.0
+67 O1 47.0
+67 O2 47.0
+67 O3 47.0
+67 F1 2.0
+67 F2 2.0
+68 K 57309.0
+68 L1 10070.0
+68 L2 9430.0
+68 L3 8600.0
+68 M1 2370.0
+68 M2 2010.0
+68 M3 1900.0
+68 M4 1640.0
+68 M5 1600.0
+68 N1 595.0
+68 N2 377.0
+68 N3 377.0
+68 N4 280.0
+68 N5 280.0
+68 O1 50.0
+68 O2 50.0
+68 O3 50.0
+68 F1 2.0
+68 F2 2.0
+69 K 59170.0
+69 L1 10470.0
+69 L2 9810.0
+69 L3 8930.0
+69 M1 2470.0
+69 M2 2100.0
+69 M3 1980.0
+69 M4 1720.0
+69 M5 1680.0
+69 N1 629.0
+69 N2 399.0
+69 N3 399.0
+69 N4 300.0
+69 N5 300.0
+69 O1 53.0
+69 O2 53.0
+69 O3 53.0
+69 F1 2.0
+69 F2 2.0
+70 K 61060.0
+70 L1 10880.0
+70 L2 10200.0
+70 L3 9270.0
+70 M1 2580.0
+70 M2 2190.0
+70 M3 2070.0
+70 M4 1800.0
+70 M5 1760.0
+70 N1 664.0
+70 N2 422.0
+70 N3 422.0
+70 N4 320.0
+70 N5 320.0
+70 O1 56.0
+70 O2 56.0
+70 O3 56.0
+70 F1 2.0
+70 F2 2.0
+71 K 62980.0
+71 L1 11300.0
+71 L2 10600.0
+71 L3 9630.0
+71 M1 2700.0
+71 M2 2290.0
+71 M3 2160.0
+71 M4 1890.0
+71 M5 1840.0
+71 N1 700.0
+71 N2 445.0
+71 N3 445.0
+71 N4 340.0
+71 N5 340.0
+71 O1 60.0
+71 O2 60.0
+71 O3 60.0
+71 F1 2.0
+71 F2 2.0
+72 K 64936.0
+72 L1 11732.0
+72 L2 11016.0
+72 L3 9998.0
+72 M1 2824.0
+72 M2 2396.0
+72 M3 2260.0
+72 M4 1982.0
+72 M5 1932.0
+72 N1 742.0
+72 N2 473.0
+72 N3 473.0
+72 N4 362.0
+72 N5 362.0
+72 O1 64.0
+72 O2 64.0
+72 O3 64.0
+72 F1 2.0
+72 F2 2.0
+73 K 66925.0
+73 L1 12173.0
+73 L2 11440.0
+73 L3 10375.0
+73 M1 2949.0
+73 M2 2505.0
+73 M3 2362.0
+73 M4 2077.0
+73 M5 2025.0
+73 N1 780.0
+73 N2 499.0
+73 N3 499.0
+73 N4 384.0
+73 N5 384.0
+73 O1 68.0
+73 O2 68.0
+73 O3 68.0
+73 F1 2.0
+73 F2 2.0
+74 K 68949.0
+74 L1 12626.0
+74 L2 11877.0
+74 L3 10762.0
+74 M1 3080.0
+74 M2 2617.0
+74 M3 2468.0
+74 M4 2174.0
+74 M5 2120.0
+74 N1 819.0
+74 N2 525.0
+74 N3 525.0
+74 N4 407.0
+74 N5 407.0
+74 O1 72.0
+74 O2 72.0
+74 O3 72.0
+74 F1 2.0
+74 F2 2.0
+75 K 71004.0
+75 L1 13090.0
+75 L2 12322.0
+75 L3 11160.0
+75 M1 3217.0
+75 M2 2732.0
+75 M3 2576.0
+75 M4 2274.0
+75 M5 2220.0
+75 N1 860.0
+75 N2 552.0
+75 N3 552.0
+75 N4 430.0
+75 N5 430.0
+75 O1 76.0
+75 O2 76.0
+75 O3 76.0
+75 F1 2.0
+75 F2 2.0
+76 K 73092.0
+76 L1 13567.0
+76 L2 12781.0
+76 L3 11570.0
+76 M1 3360.0
+76 M2 2854.0
+76 M3 2686.0
+76 M4 2380.0
+76 M5 2320.0
+76 N1 902.0
+76 N2 580.0
+76 N3 580.0
+76 N4 455.0
+76 N5 455.0
+76 O1 80.0
+76 O2 80.0
+76 O3 80.0
+76 F1 2.0
+76 F2 2.0
+77 K 75210.0
+77 L1 14056.0
+77 L2 13251.0
+77 L3 11990.0
+77 M1 3500.0
+77 M2 2970.0
+77 M3 2796.0
+77 M4 2490.0
+77 M5 2430.0
+77 N1 940.0
+77 N2 607.0
+77 N3 607.0
+77 N4 478.0
+77 N5 478.0
+77 O1 84.0
+77 O2 84.0
+77 O3 84.0
+77 F1 2.0
+77 F2 2.0
+78 K 77360.0
+78 L1 14555.0
+78 L2 13733.0
+78 L3 12420.0
+78 M1 3640.0
+78 M2 3090.0
+78 M3 2910.0
+78 M4 2600.0
+78 M5 2540.0
+78 N1 980.0
+78 N2 635.0
+78 N3 635.0
+78 N4 500.0
+78 N5 500.0
+78 O1 88.0
+78 O2 88.0
+78 O3 88.0
+78 F1 2.0
+78 F2 2.0
+79 K 79538.0
+79 L1 15070.0
+79 L2 14220.0
+79 L3 12850.0
+79 M1 3790.0
+79 M2 3220.0
+79 M3 3020.0
+79 M4 2710.0
+79 M5 2640.0
+79 N1 1020.0
+79 N2 660.0
+79 N3 660.0
+79 N4 522.0
+79 N5 522.0
+79 O1 92.0
+79 O2 92.0
+79 O3 92.0
+79 F1 2.0
+79 F2 2.0
+80 K 81750.0
+80 L1 15600.0
+80 L2 14730.0
+80 L3 13300.0
+80 M1 3950.0
+80 M2 3350.0
+80 M3 3140.0
+80 M4 2830.0
+80 M5 2750.0
+80 N1 1060.0
+80 N2 690.0
+80 N3 690.0
+80 N4 544.0
+80 N5 544.0
+80 O1 96.0
+80 O2 96.0
+80 O3 96.0
+80 F1 2.0
+80 F2 2.0
+81 K 83990.0
+81 L1 16140.0
+81 L2 15240.0
+81 L3 13770.0
+81 M1 4110.0
+81 M2 3480.0
+81 M3 3270.0
+81 M4 2950.0
+81 M5 2870.0
+81 N1 1100.0
+81 N2 720.0
+81 N3 720.0
+81 N4 568.0
+81 N5 568.0
+81 O1 100.0
+81 O2 100.0
+81 O3 100.0
+81 F1 2.0
+81 F2 2.0
+82 K 86260.0
+82 L1 16690.0
+82 L2 15770.0
+82 L3 14220.0
+82 M1 4270.0
+82 M2 3610.0
+82 M3 3390.0
+82 M4 3080.0
+82 M5 2990.0
+82 N1 1150.0
+82 N2 750.0
+82 N3 750.0
+82 N4 590.0
+82 N5 590.0
+82 O1 104.0
+82 O2 104.0
+82 O3 104.0
+82 F1 2.0
+82 F2 2.0
+83 K 88560.0
+83 L1 17250.0
+83 L2 16310.0
+83 L3 14710.0
+83 M1 4440.0
+83 M2 3750.0
+83 M3 3520.0
+83 M4 3210.0
+83 M5 3110.0
+83 N1 1190.0
+83 N2 780.0
+83 N3 780.0
+83 N4 610.0
+83 N5 610.0
+83 O1 108.0
+83 O2 108.0
+83 O3 108.0
+83 F1 2.0
+83 F2 2.0
+84 K 90890.0
+84 L1 17820.0
+84 L2 16860.0
+84 L3 15200.0
+84 M1 4620.0
+84 M2 3890.0
+84 M3 3650.0
+84 M4 3340.0
+84 M5 3230.0
+84 N1 1230.0
+84 N2 810.0
+84 N3 810.0
+84 N4 630.0
+84 N5 630.0
+84 O1 112.0
+84 O2 112.0
+84 O3 112.0
+84 F1 2.0
+84 F2 2.0
+85 K 93250.0
+85 L1 18400.0
+85 L2 17420.0
+85 L3 15700.0
+85 M1 4800.0
+85 M2 4030.0
+85 M3 3780.0
+85 M4 3470.0
+85 M5 3360.0
+85 N1 1280.0
+85 N2 840.0
+85 N3 840.0
+85 N4 650.0
+85 N5 650.0
+85 O1 116.0
+85 O2 116.0
+85 O3 116.0
+85 F1 2.0
+85 F2 2.0
+86 K 95640.0
+86 L1 18990.0
+86 L2 18000.0
+86 L3 16210.0
+86 M1 4980.0
+86 M2 4170.0
+86 M3 3910.0
+86 M4 3600.0
+86 M5 3480.0
+86 N1 1320.0
+86 N2 870.0
+86 N3 870.0
+86 N4 670.0
+86 N5 670.0
+86 O1 120.0
+86 O2 120.0
+86 O3 120.0
+86 F1 2.0
+86 F2 2.0
+87 K 98050.0
+87 L1 19590.0
+87 L2 18580.0
+87 L3 16730.0
+87 M1 5170.0
+87 M2 4320.0
+87 M3 4040.0
+87 M4 3740.0
+87 M5 3610.0
+87 N1 1370.0
+87 N2 900.0
+87 N3 900.0
+87 N4 690.0
+87 N5 690.0
+87 O1 124.0
+87 O2 124.0
+87 O3 124.0
+87 F1 2.0
+87 F2 2.0
+88 K 100490.0
+88 L1 20210.0
+88 L2 19180.0
+88 L3 17270.0
+88 M1 5360.0
+88 M2 4470.0
+88 M3 4180.0
+88 M4 3880.0
+88 M5 3740.0
+88 N1 1420.0
+88 N2 930.0
+88 N3 930.0
+88 N4 710.0
+88 N5 710.0
+88 O1 128.0
+88 O2 128.0
+88 O3 128.0
+88 F1 2.0
+88 F2 2.0
+89 K 102960.0
+89 L1 20840.0
+89 L2 19780.0
+89 L3 17820.0
+89 M1 5560.0
+89 M2 4620.0
+89 M3 4320.0
+89 M4 4020.0
+89 M5 3870.0
+89 N1 1470.0
+89 N2 960.0
+89 N3 960.0
+89 N4 730.0
+89 N5 730.0
+89 O1 132.0
+89 O2 132.0
+89 O3 132.0
+89 F1 2.0
+89 F2 2.0
+90 K 105450.0
+90 L1 21490.0
+90 L2 20400.0
+90 L3 18390.0
+90 M1 5760.0
+90 M2 4780.0
+90 M3 4470.0
+90 M4 4160.0
+90 M5 4010.0
+90 N1 1520.0
+90 N2 990.0
+90 N3 990.0
+90 N4 750.0
+90 N5 750.0
+90 O1 136.0
+90 O2 136.0
+90 O3 136.0
+90 F1 2.0
+90 F2 2.0
+91 K 107970.0
+91 L1 22150.0
+91 L2 21020.0
+91 L3 18960.0
+91 M1 5970.0
+91 M2 4940.0
+91 M3 4610.0
+91 M4 4300.0
+91 M5 4150.0
+91 N1 1570.0
+91 N2 1020.0
+91 N3 1020.0
+91 N4 770.0
+91 N5 770.0
+91 O1 140.0
+91 O2 140.0
+91 O3 140.0
+91 F1 2.0
+91 F2 2.0
+92 K 110530.0
+92 L1 22810.0
+92 L2 21670.0
+92 L3 19550.0
+92 M1 6190.0
+92 M2 5110.0
+92 M3 4760.0
+92 M4 4450.0
+92 M5 4290.0
+92 N1 1630.0
+92 N2 1050.0
+92 N3 1050.0
+92 N4 790.0
+92 N5 790.0
+92 O1 144.0
+92 O2 144.0
+92 O3 144.0
+92 F1 2.0
+92 F2 2.0
+93 K 113110.0
+93 L1 23490.0
+93 L2 22330.0
+93 L3 20150.0
+93 M1 6410.0
+93 M2 5290.0
+93 M3 4910.0
+93 M4 4600.0
+93 M5 4440.0
+93 N1 1690.0
+93 N2 1080.0
+93 N3 1080.0
+93 N4 810.0
+93 N5 810.0
+93 O1 148.0
+93 O2 148.0
+93 O3 148.0
+93 F1 2.0
+93 F2 2.0
+94 K 115710.0
+94 L1 24180.0
+94 L2 23000.0
+94 L3 20760.0
+94 M1 6640.0
+94 M2 5460.0
+94 M3 5070.0
+94 M4 4760.0
+94 M5 4590.0
+94 N1 1750.0
+94 N2 1110.0
+94 N3 1110.0
+94 N4 830.0
+94 N5 830.0
+94 O1 152.0
+94 O2 152.0
+94 O3 152.0
+94 F1 2.0
+94 F2 2.0
+95 K 118350.0
+95 L1 24890.0
+95 L2 23690.0
+95 L3 21390.0
+95 M1 6870.0
+95 M2 5640.0
+95 M3 5230.0
+95 M4 4920.0
+95 M5 4750.0
+95 N1 1810.0
+95 N2 1140.0
+95 N3 1140.0
+95 N4 860.0
+95 N5 860.0
+95 O1 156.0
+95 O2 156.0
+95 O3 156.0
+95 F1 2.0
+95 F2 2.0
+96 K 121020.0
+96 L1 25610.0
+96 L2 24390.0
+96 L3 22030.0
+96 M1 7100.0
+96 M2 5830.0
+96 M3 5400.0
+96 M4 5090.0
+96 M5 4910.0
+96 N1 1880.0
+96 N2 1180.0
+96 N3 1180.0
+96 N4 890.0
+96 N5 890.0
+96 O1 160.0
+96 O2 160.0
+96 O3 160.0
+96 F1 2.0
+96 F2 2.0
+97 K 123710.0
+97 L1 26340.0
+97 L2 25100.0
+97 L3 22680.0
+97 M1 7340.0
+97 M2 6020.0
+97 M3 5570.0
+97 M4 5260.0
+97 M5 5080.0
+97 N1 1950.0
+97 N2 1210.0
+97 N3 1210.0
+97 N4 920.0
+97 N5 920.0
+97 O1 164.0
+97 O2 164.0
+97 O3 164.0
+97 F1 2.0
+97 F2 2.0
+98 K 126440.0
+98 L1 27080.0
+98 L2 25820.0
+98 L3 23340.0
+98 M1 7580.0
+98 M2 6220.0
+98 M3 5750.0
+98 M4 5430.0
+98 M5 5250.0
+98 N1 2020.0
+98 N2 1250.0
+98 N3 1250.0
+98 N4 950.0
+98 N5 950.0
+98 O1 168.0
+98 O2 168.0
+98 O3 168.0
+98 F1 2.0
+98 F2 2.0
+99 K 129190.0
+99 L1 27840.0
+99 L2 26550.0
+99 L3 24010.0
+99 M1 7830.0
+99 M2 6420.0
+99 M3 5940.0
+99 M4 5610.0
+99 M5 5420.0
+99 N1 2090.0
+99 N2 1280.0
+99 N3 1280.0
+99 N4 980.0
+99 N5 980.0
+99 O1 172.0
+99 O2 172.0
+99 O3 172.0
+99 F1 2.0
+99 F2 2.0
+100 K 131970.0
+100 L1 28620.0
+100 L2 27290.0
+100 L3 24700.0
+100 M1 8090.0
+100 M2 6630.0
+100 M3 6130.0
+100 M4 5790.0
+100 M5 5600.0
+100 N1 2160.0
+100 N2 1320.0
+100 N3 1320.0
+100 N4 1010.0
+100 N5 1010.0
+100 O1 176.0
+100 O2 176.0
+100 O3 176.0
+100 F1 2.0
+100 F2 2.0
+101 K 134780.0
+101 L1 29400.0
+101 L2 28050.0
+101 L3 25410.0
+101 M1 8350.0
+101 M2 6840.0
+101 M3 6330.0
+101 M4 5980.0
+101 M5 5780.0
+101 N1 2230.0
+101 N2 1360.0
+101 N3 1360.0
+101 N4 1040.0
+101 N5 1040.0
+101 O1 180.0
+101 O2 180.0
+101 O3 180.0
+101 F1 2.0
+101 F2 2.0
+102 K 137620.0
+102 L1 30200.0
+102 L2 28810.0
+102 L3 26130.0
+102 M1 8620.0
+102 M2 7060.0
+102 M3 6530.0
+102 M4 6170.0
+102 M5 5960.0
+102 N1 2300.0
+102 N2 1400.0
+102 N3 1400.0
+102 N4 1070.0
+102 N5 1070.0
+102 O1 184.0
+102 O2 184.0
+102 O3 184.0
+102 F1 2.0
+102 F2 2.0
+103 K 140480.0
+103 L1 31010.0
+103 L2 29590.0
+103 L3 26860.0
+103 M1 8900.0
+103 M2 7280.0
+103 M3 6740.0
+103 M4 6360.0
+103 M5 6150.0
+103 N1 2370.0
+103 N2 1440.0
+103 N3 1440.0
+103 N4 1100.0
+103 N5 1100.0
+103 O1 188.0
+103 O2 188.0
+103 O3 188.0
+103 F1 2.0
+103 F2 2.0
+        `;
+        
+        // This function will be called on load to parse the embedded data
+        function parseAndLoadEnergyData() {
+            try {
+                const text = edgesDataContent;
+                
+                // Clear any existing data before parsing new data
+                parsedCustomEnergyLevels.clear();
+
+                text.trim().split('\n').forEach(line => {
+                    const parts = line.trim().split(/\s+/);
+                    if (parts.length === 3) {
+                        const Z = parseInt(parts[0]);
+                        const subshellChar = parts[1];
+                        const energy = parseFloat(parts[2]);
+
+                        if (!isNaN(Z) && !isNaN(energy) && subshellCharToType[subshellChar]) {
+                            const shellDesignatorToOrbital = {
+                                'K': {n:1, l_type:'s'}, 'L1': {n:2, l_type:'s'}, 'L2': {n:2, l_type:'p'}, 'L3': {n:2, l_type:'p'},
+                                'M1': {n:3, l_type:'s'}, 'M2': {n:3, l_type:'p'}, 'M3': {n:3, l_type:'p'}, 'M4': {n:3, l_type:'d'}, 'M5': {n:3, l_type:'d'},
+                                'N1': {n:4, l_type:'s'}, 'N2': {n:4, l_type:'p'}, 'N3': {n:4, l_type:'p'}, 'N4': {n:4, l_type:'d'}, 'N5': {n:4, l_type:'d'}, 'N6': {n:4, l_type:'f'}, 'N7': {n:4, l_type:'f'},
+                                'O1': {n:5, l_type:'s'}, 'O2': {n:5, l_type:'p'}, 'O3': {n:5, l_type:'p'}, 'O4': {n:5, l_type:'d'}, 'O5': {n:5, l_type:'d'}, 'O6': {n:5, l_type:'f'}, 'O7': {n:5, l_type:'f'},
+                                'P1': {n:6, l_type:'s'}, 'P2': {n:6, l_type:'p'}, 'P3': {n:6, l_type:'p'}, 'P4': {n:6, l_type:'d'}, 'P5': {n:6, l_type:'d'},
+                            };
+                            const orbitalInfo = shellDesignatorToOrbital[subshellChar];
+                            if (orbitalInfo) {
+                                const orbitalName = `${orbitalInfo.n}${orbitalInfo.l_type}`;
+                                
+                                if (!parsedCustomEnergyLevels.has(Z)) {
+                                    parsedCustomEnergyLevels.set(Z, new Map());
+                                }
+                                parsedCustomEnergyLevels.get(Z).set(orbitalName, energy);
+                            } else {
+                                console.warn(`Unknown subshell character: ${subshellChar} for Z=${Z}`);
+                            }
+                        }
+                    }
+                });
+                console.log("Custom energy data loaded and parsed:", parsedCustomEnergyLevels);
+
+            } catch (error) {
+                console.error("Error loading custom energy data:", error);
+                transitionDetailsContent.innerHTML = `<p class="text-red-600 font-bold">Error parsing embedded energy data: ${error.message}. Using fallback data.</p>`;
+                transitionModal.style.display = 'flex';
+            }
+        }
+
+
+        // Function to get the actual energy for a given transition
+        function getActualEnergy(atomicNumber, fromOrbital, toOrbital) {
+            const elementEnergyMap = parsedCustomEnergyLevels.get(atomicNumber);
+            if (elementEnergyMap) {
+                const energyFromCustom = elementEnergyMap.get(fromOrbital);
+                const energyToCustom = elementEnergyMap.get(toOrbital);
+
+                if (energyFromCustom !== undefined && energyToCustom !== undefined) {
+                    return `${Math.abs(energyToCustom - energyFromCustom).toFixed(2)} eV`;
+                }
+            }
+
+            const elementData = transitionEnergiesData[atomicNumber];
+            if (elementData) {
+                const fromN = parseInt(fromOrbital.charAt(0));
+                const toN = parseInt(toOrbital.charAt(0));
+                const fromLType = fromOrbital.slice(1);
+                const toLType = toOrbital.slice(1);
+
+                let specificEnergy = null;
+                const exactKey = `${fromN}${fromLType}-${toN}${toLType}`;
+                if (elementData[exactKey]) {
+                    specificEnergy = elementData[exactKey];
+                } else {
+                    if (toN === 1 && toLType === 's') { // K-series
+                        if (fromN === 2 && fromLType === 'p' && elementData['2p-1s']) specificEnergy = elementData['2p-1s'];
+                        else if (fromN === 3 && fromLType === 'p' && elementData['3p-1s']) specificEnergy = elementData['3p-1s'];
+                        else if (fromN === 3 && fromLType === 'd' && elementData['3d-1s']) specificEnergy = elementData['3d-1s'];
+                    } else if (toN === 2) { // L-series
+                        if (fromN === 3 && fromLType === 'd' && toLType === 'p' && elementData['3d-2p']) specificEnergy = elementData['3d-2p'];
+                        else if (fromN === 4 && fromLType === 'd' && toLType === 'p' && elementData['4d-2p']) specificEnergy = elementData['4d-2p'];
+                        else if (fromN === 3 && fromLType === 's' && toLType === 'p' && elementData['3s-2p']) specificEnergy = elementData['3s-2p'];
+                    }
+                }
+                if (specificEnergy !== null) {
+                    return `${specificEnergy.toFixed(2)} eV`;
+                }
+            }
+            return 'Conceptual Energy';
+        }
+
+        function getTransitionDescriptiveName(fromOrbital, toOrbital, type) {
+            const fromN = parseInt(fromOrbital.charAt(0));
+            const toN = parseInt(toOrbital.charAt(0));
+            const fromLType = fromOrbital.slice(1);
+            const toLType = toOrbital.slice(1);
+
+            const fromShellChar = xRayShellMapping[fromN];
+            const toShellChar = xRayShellMapping[toN];
+
+            if (fromShellChar && toShellChar) {
+                if (toN === 1 && toLType === 's') { // K-series
+                    if (fromN === 2 && fromLType === 'p') return `Kα (${fromOrbital} to ${toOrbital})`;
+                    if (fromN === 3 && fromLType === 'p') return `Kβ1 (${fromOrbital} to ${toOrbital})`;
+                    if (fromN === 3 && fromLType === 'd') return `Kβ' (${fromOrbital} to ${toOrbital})`;
+                } else if (toN === 2 && (toLType === 's' || toLType === 'p')) { // L-series
+                    if (fromN === 3 && fromLType === 'd') return `Lα1 (${fromOrbital} to ${toOrbital})`;
+                    if (fromN === 4 && fromLType === 'd') return `Lβ2 (${fromOrbital} to ${toOrbital})`;
+                    if (fromN === 3 && fromLType === 's') return `Lβ3 (${fromOrbital} to ${toOrbital})`;
+                }
+            }
+            return `${fromOrbital} \u2192 ${toOrbital} ${type === 'emission' ? 'Emission' : 'Absorption'}`;
+        }
+
+        let conciseLabelCounters = {};
+
+        function getConciseXRayLabel(fromOrbital, toOrbital, type) {
+            const fromN = parseInt(fromOrbital.charAt(0));
+            const toN = parseInt(toOrbital.charAt(0));
+            const fromLType = fromOrbital.slice(1);
+            const toLType = toOrbital.slice(1);
+
+            let baseLabel = `${fromOrbital} \u2192 ${toOrbital}`;
+
+            if (fromN > toN) { // Emission
+                if (toN === 1 && toLType === 's') {
+                    if (fromN === 2 && fromLType === 'p') baseLabel = `Kα`;
+                    else if (fromN === 3 && fromLType === 'p') baseLabel = `Kβ1`;
+                    else if (fromN === 3 && fromLType === 'd') baseLabel = `Kβ'`;
+                    else if (fromN === 4 && fromLType === 'p') baseLabel = `Kβ2`;
+                    else if (fromN === 4 && fromLType === 'd') baseLabel = `Kβ3`;
+                    else if (fromN === 4 && fromLType === 'f') baseLabel = `Kβ4`;
+                } else if (toN === 2 && (toLType === 's' || toLType === 'p')) {
+                    if (fromN === 3 && fromLType === 'd') baseLabel = `Lα1`;
+                    else if (fromN === 3 && fromLType === 's') baseLabel = `Lβ3`;
+                    else if (fromN === 4 && fromLType === 'd') baseLabel = `Lβ2`;
+                    else if (fromN === 4 && fromLType === 'f') baseLabel = `Lβ5`;
+                }
+            } else { // Absorption
+                if (fromN === 1 && fromLType === 's') {
+                    baseLabel = `K-edge`;
+                } else if (fromN === 2 && (fromLType === 's' || fromLType === 'p')) {
+                    baseLabel = `L-edge`;
+                }
+            }
+
+            const key = `${baseLabel}-${type}`;
+            if (!conciseLabelCounters[key]) {
+                conciseLabelCounters[key] = 0;
+            }
+            conciseLabelCounters[key]++;
+
+            if (conciseLabelCounters[key] > 1) {
+                return `${baseLabel} (${conciseLabelCounters[key]})`;
+            } else {
+                return baseLabel;
+            }
+        }
+
+
+        // Function to generate all possible transitions for the current atom
+        function generateAllTransitions() {
+            const tempTransitionsData = [];
+            const currentTotalShells = window.totalShells;
+            const currentAtomicNumber = window.currentAtomicNumber;
+
+            if (currentTotalShells < 2) {
+                return [];
+            }
+            
+            const allPossibleSubshellsInAtom = [];
+            for (let n = 1; n <= currentTotalShells; n++) {
+                for (let l = 0; l < n && l < orbitalTypes.length; l++) {
+                    allPossibleSubshellsInAtom.push(`${n}${orbitalTypes[l]}`);
+                }
+            }
+
+            // Reset counters for concise labels for a fresh generation
+            conciseLabelCounters = {};
+
+            for (let i = 0; i < allPossibleSubshellsInAtom.length; i++) {
+                const fromOrbital = allPossibleSubshellsInAtom[i];
+                const fromN = parseInt(fromOrbital.charAt(0));
+                const fromL = orbitalTypeLValues[fromOrbital.slice(1)];
+                const r1 = subshellRadiiMap[fromOrbital];
+
+                for (let j = 0; j < allPossibleSubshellsInAtom.length; j++) {
+                    const toOrbital = allPossibleSubshellsInAtom[j];
+                    const toN = parseInt(toOrbital.charAt(0));
+                    const toL = orbitalTypeLValues[toOrbital.slice(1)];
+                    const r2 = subshellRadiiMap[toOrbital];
+
+                    if (r1 === undefined || r2 === undefined) continue;
+
+                    // Apply selection rule Δl = ±1
+                    if (Math.abs(fromL - toL) === 1) { 
+                        const energyValue = getActualEnergy(currentAtomicNumber, fromOrbital, toOrbital);
+                        const length = Math.abs(r1 - r2);
+                        
+                        if (fromN > toN || (fromN === toN && r1 > r2)) { // Emission
+                            tempTransitionsData.push({
+                                from: fromOrbital, to: toOrbital,
+                                fromN: fromN, fromL: fromL, toN: toN, toL: toL,
+                                length: length,
+                                name: getTransitionDescriptiveName(fromOrbital, toOrbital, 'emission'),
+                                conciseLabel: getConciseXRayLabel(fromOrbital, toOrbital, 'emission'),
+                                energy: energyValue,
+                                width: 'Conceptual Width', decay: 'Conceptual Decay Time', type: 'emission'
+                            });
+                        }
+                        else if (fromN < toN || (fromN === toN && r1 < r2)) { // Absorption
+                            tempTransitionsData.push({
+                                from: fromOrbital, to: toOrbital,
+                                fromN: fromN, fromL: fromL, toN: toN, toL: toL,
+                                length: length,
+                                name: getTransitionDescriptiveName(fromOrbital, toOrbital, 'absorption'),
+                                conciseLabel: getConciseXRayLabel(fromOrbital, toOrbital, 'absorption'),
+                                energy: energyValue,
+                                width: 'Conceptual Width', decay: 'Conceptual Decay Time', type: 'absorption'
+                            });
+                        }
+                    }
+                }
+            }
+            // Sort transitions
+            tempTransitionsData.sort((a, b) => {
+                if (a.fromN !== b.fromN) return a.fromN - b.fromN;
+                if (a.length !== b.length) return b.length - a.length;
+                if (a.toN !== b.toN) return a.toN - b.toN;
+                if (a.fromL !== b.fromL) return a.fromL - b.fromL;
+                if (a.toL !== b.toL) return a.toL - b.toL;
+                return 0;
+            });
+
+            return tempTransitionsData;
+        }
+
+        // Function to render the transitions based on the generated data
+        function renderTransitions(transitionsToRender) {
+            transitionsGroup.html(''); // Clear existing SVG elements for transitions
+
+            const labelPerpOffset = 8;
+            const totalAngle = 2 * Math.PI;
+            
+            const transitionsByOriginShell = new Map();
+            transitionsToRender.forEach(t => {
+                const originN = t.fromN;
+                if (!transitionsByOriginShell.has(originN)) {
+                    transitionsByOriginShell.set(originN, []);
+                }
+                transitionsByOriginShell.get(originN).push(t);
+            });
+
+            const sortedOriginShells = Array.from(transitionsByOriginShell.keys()).sort((a, b) => a - b);
+            const numMajorGroups = sortedOriginShells.length;
+
+            const startAngleOffset = Math.PI / 2;
+            let currentAngularPosition = startAngleOffset;
+
+            const angleForMajorGroups = totalAngle * 0.85;
+            const anglePerMajorGroup = numMajorGroups > 0 ? angleForMajorGroups / numMajorGroups : 0;
+            const anglePaddingWithinGroup = 0.08;
+
+            sortedOriginShells.forEach(originN => {
+                const groupTransitions = transitionsByOriginShell.get(originN);
+                
+                const groupCenterAngle = currentAngularPosition;
+
+                groupTransitions.forEach((transition, indexInGroup) => {
+                    const r1 = subshellRadiiMap[transition.from];
+                    const r2 = subshellRadiiMap[transition.to];
+
+                    if (r1 === undefined || r2 === undefined) {
+                        console.warn(`Radius for ${transition.from} or ${transition.to} not found.`);
+                        return;
+                    }
+
+                    const finalAngle = groupCenterAngle + (indexInGroup * anglePaddingWithinGroup);
+                    const adjustedAngle = finalAngle % totalAngle;
+
+                    let x1, y1, x2, y2;
+                    
+                    if (transition.type === 'emission') {
+                        x1 = drawingCenterX + r1 * Math.cos(adjustedAngle);
+                        y1 = drawingCenterY + r1 * Math.sin(adjustedAngle);
+                        x2 = drawingCenterX + r2 * Math.cos(adjustedAngle); 
+                        y2 = drawingCenterY + r2 * Math.sin(adjustedAngle);
+                    } else { // Absorption
+                        x1 = drawingCenterX + r1 * Math.cos(adjustedAngle);
+                        y1 = drawingCenterY + r1 * Math.sin(adjustedAngle);
+                        x2 = drawingCenterX + r2 * Math.cos(adjustedAngle);
+                        y2 = drawingCenterY + r2 * Math.sin(adjustedAngle);
+                    }
+
+                    const arrow = transitionsGroup.append('line')
+                        .attr('x1', x1)
+                        .attr('y1', y1)
+                        .attr('x2', x2)
+                        .attr('y2', y2)
+                        .attr('class', `transition-arrow ${transition.type}`)
+                        .attr('marker-end', `url(#arrowhead-${transition.type})`);
+
+                    arrow.node().dataset.transitionName = transition.name;
+                    arrow.node().dataset.conciseLabel = transition.conciseLabel;
+                    arrow.node().dataset.transitionEnergy = transition.energy;
+                    arrow.node().dataset.transitionWidth = transition.width;
+                    arrow.node().dataset.transitionDecay = transition.decay;
+                    arrow.node().dataset.transitionType = transition.type;
+                    arrow.node().dataset.fromOrbital = transition.from;
+                    arrow.node().dataset.toOrbital = transition.to;
+
+                    // Hover for tooltip (showing full descriptive name and energy)
+                    arrow.on('mouseover', (event, d) => {
+                        const pageX = event.pageX;
+                        const pageY = event.pageY;
+
+                        tooltip.innerHTML = `
+                            <strong>Transition:</strong> ${arrow.node().dataset.transitionName}<br>
+                            <strong>Energy:</strong> ${arrow.node().dataset.transitionEnergy}
+                        `;
+                        tooltip.classList.add('visible');
+                        tooltip.style.left = `${pageX + 10}px`;
+                        tooltip.style.top = `${pageY + 10}px`;
+                    });
+                    arrow.on('mouseout', () => {
+                        tooltip.classList.remove('visible');
+                    });
+                    arrow.on('mousemove', (event) => {
+                        tooltip.style.left = `${event.pageX + 10}px`;
+                        tooltip.style.top = `${event.pageY + 10}px`;
+                    });
+
+                    arrow.on('click', (event, d) => {
+                        transitionDetailsContent.innerHTML = `
+                            <p><strong>Transition:</strong> ${arrow.node().dataset.transitionName}</p>
+                            <p><strong>From Orbital:</strong> ${arrow.node().dataset.fromOrbital} \u2192 <strong>To Orbital:</strong> ${arrow.node().dataset.toOrbital}</p>
+                            <p><strong>Type:</strong> ${arrow.node().dataset.transitionType === 'emission' ? 'Emission (electron moves to lower shell, releasing energy)' : 'Absorption (electron moves to higher shell, absorbing energy)'}</p>
+                            <p><strong>Energy:</strong> ${arrow.node().dataset.transitionEnergy}</p>
+                            <p><strong>Conceptual Width:</strong> ${arrow.node().dataset.transitionWidth}</p>
+                            <p><strong>Conceptual Decay Time:</strong> ${arrow.node().dataset.transitionDecay}</p>
+                            <p class="text-sm text-gray-600 mt-2">
+                                    <em>Actual values depend on specific quantum mechanical states and require experimental data. X-ray transition labels (e.g., L<sub>II</sub> &rarr; K<sub>&alpha;</sub>) refer to subshell energy levels that include fine structure (spin-orbit coupling) not explicitly depicted in this Bohr model. The subshell type (s, p, d) is used for clarity.</em>
+                            </p>
+                        `;
+                        transitionModal.style.display = 'flex';
+                    });
+
+                    const midX = (x1 + x2) / 2;
+                    const midY = (y1 + y2) / 2;
+                    const lineAngle = Math.atan2(y2 - y1, x2 - x1);
+                    const textPerpAngle = (adjustedAngle > Math.PI / 2 && adjustedAngle < 3 * Math.PI / 2) ? lineAngle - Math.PI / 2 : lineAngle + Math.PI / 2;
+                    const textX = midX + labelPerpOffset * Math.cos(textPerpAngle);
+                    const textY = midY + labelPerpOffset * Math.sin(textPerpAngle);
+
+                    transitionsGroup.append('text')
+                        .attr('x', textX)
+                        .attr('y', textY)
+                        .attr('text-anchor', 'middle')
+                        .attr('dominant-baseline', 'middle')
+                        .attr('class', `transition-text ${transition.type}`)
+                        .text(transition.conciseLabel);
+                });
+                currentAngularPosition += anglePerMajorGroup;
+            });
+        }
+
+        // D3.js setup for zoom and pan
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 10])
+            .on("zoom", (event) => {
+                zoomableElementsGroup.attr("transform", event.transform);
+                const currentScale = event.transform.k;
+                const baseFontSize = 8;
+                const transitionLabelFontSize = 0.75 * 16; /* 0.75rem * 16px/rem */
+                
+                zoomableElementsGroup.selectAll(".electron-label, .nucleus-text")
+                    .style("font-size", `${baseFontSize / currentScale}px`);
+                zoomableElementsGroup.selectAll(".transition-text")
+                    .style("font-size", `${transitionLabelFontSize / currentScale}px`);
+                zoomableElementsGroup.selectAll(".transition-arrow")
+                    .style("stroke-width", `${2.5 / Math.sqrt(currentScale)}px`);
+            });
+
+        atomSvg.call(zoom);
+
+        // Function to reset the view to initial zoom and pan
+        function resetView() {
+            // Reset to identity transform (no translation, no scaling)
+            atomSvg.transition()
+                .duration(750)
+                .call(zoom.transform, d3.zoomIdentity);
+        }
+
+        // Functions to control visibility of specific transition types
+        function showEmissionTransitions() {
+            isEmissionVisible = !isEmissionVisible;
+            transitionsGroup.selectAll('.transition-arrow.emission, .transition-text.emission')
+                .classed('visible', isEmissionVisible);
+            if (isEmissionVisible && isAbsorptionVisible) {
+                isAbsorptionVisible = false;
+                transitionsGroup.selectAll('.transition-arrow.absorption, .transition-text.absorption')
+                    .classed('visible', false);
+            }
+        }
+
+        function showAbsorptionTransitions() {
+            isAbsorptionVisible = !isAbsorptionVisible;
+            transitionsGroup.selectAll('.transition-arrow.absorption, .transition-text.absorption')
+                .classed('visible', isAbsorptionVisible);
+            if (isAbsorptionVisible && isEmissionVisible) {
+                isEmissionVisible = false;
+                transitionsGroup.selectAll('.transition-arrow.emission, .transition-text.emission')
+                    .classed('visible', false);
+            }
+        }
+
+        function hideAllTransitions() {
+            isEmissionVisible = false;
+            isAbsorptionVisible = false;
+            transitionsGroup.selectAll('.transition-arrow, .transition-text').classed('visible', false);
+        }
+
+        // Handle responsiveness for SVG
+        function resizeSvg() {
+            const containerWidth = atomSvg.node().parentElement.clientWidth;
+            const newSize = Math.min(containerWidth - 40, 700);
+            atomSvg.style('width', `${newSize}px`)
+                   .style('height', `${newSize}px`);
+        }
+
+        // Attaches event listeners for dynamically created SVG elements
+        function attachEventListeners() {
+            tooltip.classList.remove('visible'); // Hide tooltip if visible during redraw
+
+            // Remove existing listeners to prevent duplicates (important for dynamic elements)
+            d3.selectAll('.electron-shell').on('mouseover', null).on('mouseout', null).on('mousemove', null);
+            d3.selectAll('.electron, .proton, .neutron').on('mouseover', null).on('mouseout', null).on('mousemove', null);
+
+            // Add hover effects for shells
+            d3.selectAll('.electron-shell').on('mouseover', function(event) {
+                const shell = d3.select(this).node();
+                const shellNum = shell.dataset.shell;
+                const subshellName = shell.dataset.subshellName; // Using new attribute
+                const maxElectrons = shell.dataset.maxElectrons;
+                const energy = shell.dataset.energy; // Get the energy
+
+                let tooltipText = `<strong>Shell ${shellNum}</strong>`;
+                if (subshellName) {
+                    tooltipText += `<br>Subshell: ${subshellName}`;
+                }
+                tooltipText += `<br>Max Electrons: ${maxElectrons || 'N/A'}`;
+                if (energy) {
+                    tooltipText += `<br>Binding Energy: ${energy} eV`;
+                }
+
+                tooltip.innerHTML = tooltipText;
+                tooltip.classList.add('visible');
+                tooltip.style.left = `${event.pageX + 10}px`;
+                tooltip.style.top = `${event.pageY + 10}px`;
+            })
+            .on('mouseout', () => {
+                tooltip.classList.remove('visible');
+            })
+            .on('mousemove', (event) => {
+                tooltip.style.left = `${event.pageX + 10}px`;
+                tooltip.style.top = `${event.pageY + 10}px`;
+            });
+
+            // Add hover effects for electrons, protons, and neutrons
+            d3.selectAll('.electron, .proton, .neutron').on('mouseover', function(event) {
+                const particle = d3.select(this).node();
+                const type = particle.dataset.type;
+                const info = particle.dataset.info;
+                tooltip.innerHTML = `<strong>${type}</strong><br>${info}`; // Use innerHTML for formatting
+                tooltip.classList.add('visible');
+                tooltip.style.left = `${event.pageX + 10}px`;
+                tooltip.style.top = `${event.pageY + 10}px`;
+            })
+            .on('mouseout', () => {
+                tooltip.classList.remove('visible');
+            })
+            .on('mousemove', (event) => {
+                tooltip.style.left = `${event.pageX + 10}px`;
+                tooltip.style.top = `${event.pageY + 10}px`;
+            });
+        }
+
+
+        // --- Core Atom Drawing Functions ---
+        function drawNucleus(protons, neutrons) {
+            nucleusParticlesGroup.html('');
+
+            for (let i = 0; i < protons; i++) {
+                const angle = (i / protons) * 2 * Math.PI;
+                const x = drawingCenterX + (nucleusRadius / 2) * Math.cos(angle);
+                const y = drawingCenterY + (nucleusRadius / 2) * Math.sin(angle);
+                nucleusParticlesGroup.append('circle')
+                    .attr('cx', x)
+                    .attr('cy', y)
+                    .attr('r', 10)
+                    .attr('class', 'proton')
+                    .attr('data-type', 'Proton')
+                    .attr('data-info', `Charge: +1`);
+            }
+
+            for (let i = 0; i < neutrons; i++) {
+                const angle = (i / neutrons) * 2 * Math.PI + Math.PI / protons;
+                const x = drawingCenterX + (nucleusRadius / 2) * Math.cos(angle + Math.PI / 2);
+                const y = drawingCenterY + (nucleusRadius / 2) * Math.sin(angle + Math.PI / 2);
+                nucleusParticlesGroup.append('circle')
+                    .attr('cx', x)
+                    .attr('cy', y)
+                    .attr('r', 10)
+                    .attr('class', 'neutron')
+                    .attr('data-type', 'Neutron')
+                    .attr('data-info', `Charge: 0`);
+            }
+
+            protonsText.text(`Protons: ${protons}`);
+            neutronsText.text(`Neutrons: ${neutrons}`);
+        }
+
+        function calculateShellConfiguration(atomicNumber) {
+            const shellCapacities = [2, 8, 18, 32, 50, 72, 98];
+            let remainingElectrons = atomicNumber;
+            const shells = [];
+            let totalShells = 0;
+
+            for (let i = 0; i < shellCapacities.length; i++) {
+                const capacity = shellCapacities[i];
+                if (remainingElectrons > 0) {
+                    const electronsInShell = Math.min(remainingElectrons, capacity);
+                    shells.push(electronsInShell);
+                    remainingElectrons -= electronsInShell;
+                    totalShells++;
+                } else {
+                    break;
+                }
+            }
+            window.totalShells = totalShells;
+            return shells;
+        }
+
+        function calculateSubshellConfiguration(atomicNumber) {
+            let remainingElectrons = atomicNumber;
+            const subshellOrder = [
+                '1s', '2s', '2p', '3s', '3p', '4s', '3d', '4p', '5s', '4d', '5p', '6s', '4f', '5d', '6p', '7s', '5f', '6d', '7p'
+            ];
+            // subshellCapacities is now globally available
+            const configuration = {};
+            const orderedSubshells = [];
+
+            for (const subshell of subshellOrder) {
+                if (remainingElectrons === 0) break;
+
+                const lType = subshell.slice(1);
+                const capacity = subshellCapacities[lType];
+                const electronsInSubshell = Math.min(remainingElectrons, capacity);
+
+                if (electronsInSubshell > 0) {
+                    configuration[subshell] = electronsInSubshell;
+                    orderedSubshells.push(`${subshell}${electronsInSubshell}`);
+                    remainingElectrons -= electronsInSubshell;
+                }
+            }
+            return { configuration, orderedSubshells };
+        }
+
+
+        function drawElectronShellsAndSubshells(shellsConfig, subshellConfig) {
+            electronSubshellsGroup.html('');
+            Object.keys(subshellRadiiMap).forEach(key => delete subshellRadiiMap[key]);
+
+            let currentMaxRadius = nucleusRadius;
+
+            const orbitalDisplayOffsets = { 's': 0, 'p': 1, 'd': 2, 'f': 3 };
+
+            const occupiedSubshells = Object.keys(subshellConfig.configuration);
+
+            const subshellsByN = new Map();
+            occupiedSubshells.forEach(subshellName => {
+                const n = parseInt(subshellName.charAt(0));
+                if (!subshellsByN.has(n)) {
+                    subshellsByN.set(n, []);
+                }
+                subshellsByN.get(n).push(subshellName);
+            });
+
+            const sortedNValues = Array.from(subshellsByN.keys()).sort((a, b) => a - b);
+
+            sortedNValues.forEach((nValue, nIndex) => {
+                const subshellsInThisShell = subshellsByN.get(nValue).sort((a, b) => {
+                    const lTypeA = a.slice(1);
+                    const lTypeB = b.slice(1);
+                    return orbitalDisplayOffsets[lTypeA] - orbitalDisplayOffsets[lTypeB];
+                });
+
+                let shellRadius = baseShellRadius + nIndex * shellBandWidth;
+
+                subshellsInThisShell.forEach((subshellName, subshellIndex) => {
+                    const radialOffset = subshellIndex * subshellOffsetInternal;
+                    const finalRadius = shellRadius + radialOffset;
+                    subshellRadiiMap[subshellName] = finalRadius;
+
+                    const energy = parsedCustomEnergyLevels.get(window.currentAtomicNumber)?.get(subshellName);
+
+                    electronSubshellsGroup.append('circle')
+                        .attr('cx', drawingCenterX)
+                        .attr('cy', drawingCenterY)
+                        .attr('r', finalRadius)
+                        .attr('class', 'electron-shell')
+                        .attr('data-shell', nValue)
+                        .attr('data-subshell-type', subshellName.slice(1))
+                        .attr('data-subshell-name', subshellName)
+                        .attr('data-max-electrons', subshellCapacities[subshellName.slice(1)])
+                        .attr('data-energy', energy !== undefined ? energy.toFixed(2) : 'N/A');
+
+                    currentMaxRadius = Math.max(currentMaxRadius, finalRadius);
+                });
+            });
+
+            const padding = 100;
+            const viewboxSize = (currentMaxRadius + electronRadius + padding) * 2;
+            atomSvg.attr('viewBox', `${-viewboxSize / 2} ${-viewboxSize / 2} ${viewboxSize} ${viewboxSize}`);
+
+            atomSvg.call(zoom.transform, d3.zoomIdentity);
+        }
+
+
+        function placeElectrons(subshellConfig) {
+            electronsGroup.html('');
+            let electronIndex = 0;
+
+            for (const subshellName of Object.keys(subshellConfig.configuration)) {
+                const numElectrons = subshellConfig.configuration[subshellName];
+                const radius = subshellRadiiMap[subshellName];
+
+                if (radius === undefined) {
+                    console.warn(`Radius not found for subshell: ${subshellName}. Cannot place electrons.`);
+                    continue;
+                }
+
+                const angleStep = (2 * Math.PI) / numElectrons;
+
+                for (let i = 0; i < numElectrons; i++) {
+                    const angle = i * angleStep;
+                    const x = drawingCenterX + radius * Math.cos(angle);
+                    const y = drawingCenterY + radius * Math.sin(angle);
+
+                    electronIndex++;
+                    const electronId = `${subshellName}${i + 1}`;
+
+                    const electronGroup = electronsGroup.append('g')
+                        .attr('class', 'electron')
+                        .attr('data-type', 'Electron')
+                        .attr('data-info', `Orbital: ${subshellName}, Index: ${i + 1}`);
+
+                    electronGroup.append('circle')
+                        .attr('cx', x)
+                        .attr('cy', y)
+                        .attr('r', electronRadius)
+                        .attr('class', 'electron-particle');
+
+                    electronGroup.append('text')
+                        .attr('x', x)
+                        .attr('y', y)
+                        .attr('class', 'electron-label')
+                        .text(electronId);
+                }
+            }
+        }
+
+        // Main function to draw the atom
+        function drawAtom(atomicNumber) {
+            window.currentAtomicNumber = atomicNumber;
+            const element = elementsData[atomicNumber];
+            const protons = atomicNumber;
+            const neutrons = Math.round(element.atomicMass - protons) || protons;
+
+            elementNameDisplay.textContent = element ? element.name : `Unknown (Z=${atomicNumber})`;
+            atomicNumberDisplay.textContent = atomicNumber;
+            protonsDisplay.textContent = protons;
+            neutronsDisplay.textContent = neutrons;
+            electronsDisplay.textContent = protons;
+
+            const shellConfig = calculateShellConfiguration(atomicNumber);
+            shellConfigDisplay.textContent = shellConfig.join(', ');
+
+            const { configuration: subshellMap, orderedSubshells: subshellStringArray } = calculateSubshellConfiguration(atomicNumber);
+            subshellConfigDisplay.textContent = subshellStringArray.join(' ');
+
+            orbitalNamesList.innerHTML = '';
+            for (let n = 1; n <= window.totalShells; n++) {
+                let orbitalsForShell = [];
+                for (let l = 0; l < n && l < orbitalTypes.length; l++) {
+                    orbitalsForShell.push(`${n}${orbitalTypes[l]}`);
+                }
+                orbitalNamesList.innerHTML += `<li>Shell ${n} (n=${n}): ${orbitalsForShell.join(', ')}</li>`;
+            }
+
+            drawNucleus(protons, neutrons);
+            drawElectronShellsAndSubshells(shellConfig, { configuration: subshellMap });
+            placeElectrons({ configuration: subshellMap });
+
+            allGeneratedTransitions = generateAllTransitions();
+            renderTransitions(allGeneratedTransitions);
+            hideAllTransitions();
+
+            attachEventListeners();
+        }
+
+
+        // --- Event Listeners and Initial Load ---
+
+        // Static button event listeners (attached once)
+        generateAtomBtn.addEventListener('click', () => drawAtom(parseInt(atomicNumberInput.value)));
+        showEmissionBtn.addEventListener('click', showEmissionTransitions);
+        showAbsorptionBtn.addEventListener('click', showAbsorptionTransitions);
+        resetViewBtn.addEventListener('click', resetView);
+        closeModalBtn.addEventListener('click', () => transitionModal.style.display = 'none');
+
+
+        window.addEventListener('load', () => {
+            parseAndLoadEnergyData();
+            drawAtom(parseInt(atomicNumberInput.value));
+            resizeSvg();
+        });
+        window.addEventListener('resize', resizeSvg);
+    </script>
+</body>
+</html>
