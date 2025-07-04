@@ -14,6 +14,9 @@ Our vision is to evolve this into a comprehensive and highly interactive educati
 3D: add model progression (progression in accuracy): so for example first model is bohr and last is Dirac-Fock, then add the intermediate models. 
 For each model explain what theory and assumptions is using, what can explain and maybe its limits. 
 
+A big part of the collaboration will be on setting the equations, computing the wave functions, obtain the 3D orbitals shape and then upload this computed 
+parts to the repo. 
+
 
 ### Phase 1: 3D Visualization Core (Short-term)
 Goal: Transition the core atom visualization from 2D to a basic 3D model, enabling fundamental 3D interaction.
