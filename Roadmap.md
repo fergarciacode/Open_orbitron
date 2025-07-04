@@ -7,6 +7,14 @@ The project currently provides a functional 2D visualization of atomic structure
 ## Future Goals
 Our vision is to evolve this into a comprehensive and highly interactive educational tool. The development is planned in phases:
 
+
+2D visualization. Orbitals and energies, add different notations and how do they relate to each other. 
+
+
+3D: add model progression (progression in accuracy): so for example first model is bohr and last is Dirac-Fock, then add the intermediate models. 
+For each model explain what theory and assumptions is using, what can explain and maybe its limits. 
+
+
 ### Phase 1: 3D Visualization Core (Short-term)
 Goal: Transition the core atom visualization from 2D to a basic 3D model, enabling fundamental 3D interaction.
 
